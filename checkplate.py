@@ -9,7 +9,8 @@ images = get_images()
 for image_path in images[5:15]:
   print(run_ocr.get_plate(image_path))
   image = cv2.imread(image_path)
-  plt.imshow(image)
+  cv_image = cv2.cvtColor(image,cv2.COLOR_RGB2BGR)
+  plt.imshow(cv_image)
   plt.show()
 
 # image_path = images[1]
