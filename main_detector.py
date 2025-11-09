@@ -1,7 +1,7 @@
 import cv2
 import easyocr
 
-video = cv2.VideoCapture(0)
+video = cv2.VideoCapture(1)
 
 reader = easyocr.Reader(['en'],gpu=False)
 
@@ -37,3 +37,5 @@ while True:
                 break
         else:
             output.append(0)
+
+print('successful')
