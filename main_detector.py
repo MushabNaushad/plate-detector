@@ -3,7 +3,7 @@ import easyocr
 
 video = cv2.VideoCapture(1)
 
-reader = easyocr.Reader(['en'],gpu=False)
+reader = easyocr.Reader(['en'])
 
 frame_counter = 0
 
