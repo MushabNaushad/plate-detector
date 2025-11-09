@@ -7,26 +7,21 @@ import matplotlib.pyplot as plt
 # Returns a list of pathnames of images and download if necessary
 def get_images():
   # Download latest version of the images via kaggle
-  path = kagglehub.dataset_download("andrewmvd/car-plate-detection")
+  path = kagglehub.dataset_download("rohankumara/sri-lanka-vehicle-number-plates")
   # print("Path to dataset files:", path)
 
-  image_dir = path + '/images'
+  image_dir = path + '/Numberplate'
   image_files = os.listdir(image_dir)
 
   images = []
-  for image in image_files:
-    images.push(image_dir + "/" + image)
+  for image in image_files[0:50]:
+    if image[-3:] == 'jpg':
+      images.append(image_dir + "/" + image)
   return images
 
 
-ex_image = cv2.imread(image_dir + "/" + image_files[3])
-plt.imshow(ex_image)
-plt.show()
+# if name = "__main__"
+# ex_image = cv2.imread(image_dir + "/" + image_files[3])
+# plt.imshow(ex_image)
+# plt.show()
 
-
-
-
-# if not image_files:
-#   print('working')
-# else:
-#   print('not working')
