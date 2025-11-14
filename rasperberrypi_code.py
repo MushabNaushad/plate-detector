@@ -46,7 +46,8 @@ camera.configure(camera.create_video_configuration(main={"size": (640, 640)}))
 camera.start()
 
 # initialize Model
-recognizer = YOLO('modelv2.pt')
+
+recognizer = YOLO('best.pt')
 reader = easyocr.Reader(['en'])
 
 # control variables
