@@ -1,5 +1,5 @@
 import cv2
-import easyocr
+from paddleocr import PaddleOCR
 from ultralytics import YOLO
 
 
@@ -28,11 +28,27 @@ def recognize_plate(image):
 
     return cropped_images
 
+def detect_text(image)->list:
+    ''' This function outputs Reads the Numberplate '''
+
+    results = reader.predict(image)
+    # to hold texts read
+    texts = []
+    text = results[0]['rec_texts']
+    if text:
+        if type(text) == list:
+            text = text[0]
+        texts.append(text)
+
+    return texts
 
 video = cv2.VideoCapture(1)
 
 recognizer = YOLO('modelv1.pt')
-reader = easyocr.Reader(['en'])
+reader = PaddleOCR(
+    use_textline_orientation=True,
+    lang='en'
+)
 
 frame_counter = 0
 
@@ -49,11 +65,8 @@ while True:
         cropped = recognize_plate(frame)
         
         #we take the first(and only) results since only one plate appears for our purpose
-        results = reader.readtext(cropped[0])
-        texts = []
+        texts = detect_text(cropped[0])
         
-        for (bound_box,text,probability) in results:
-            texts.append(text)
         
         for plate in plates:
             # splitting the plate numbers, since it doesn't read as a group
