@@ -47,7 +47,7 @@ camera.start()
 
 # initialize Model
 
-recognizer = YOLO('best.pt')
+recognizer = YOLO('modelv2.pt')
 reader = easyocr.Reader(['en'])
 
 # control variables
