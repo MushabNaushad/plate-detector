@@ -4,6 +4,12 @@ from paddleocr import PaddleOCR
 from ultralytics import YOLO
 import re
 from collections import Counter
+import sys
+
+def cleanup():
+    camera.stop()
+
+    
 
 def plate_recognizer(image):
     ''' This Function recognizes the numberplate and return the cropped image of the plate'''
@@ -74,7 +80,7 @@ camera.configure(camera.create_video_configuration(main={"size": (640, 640)}))
 camera.start()
 
 # initialize Model
-recognizer = YOLO('best.pt')
+recognizer = YOLO('modelv2.pt')
 reader = PaddleOCR(
     use_textline_orientation=True,
     lang='en'
@@ -84,37 +90,51 @@ reader = PaddleOCR(
 frame_counter = 0
 check_frame = 20
 allowed_plates = [
-    ['CP','VS','4035']
+	['CP','VS','4035']
 ]
+try:
+    while True:
+        frame_4_ch = camera.capture_array()
+        if frame_4_ch is not None:
+            frame = cv2.cvtColor(frame_4_ch,cv2.COLOR_RGBA2RGB)
+            frame_counter += 1
+    
+            if frame_counter % check_frame == 0:
+                frame_counter = 0
+                cropped_set = plate_recognizer(frame)
+                # taking the best possible set
+	    
+                if cropped_set:
+                    plate = cropped_set[0]
+                    if plate.size == 0 or plate.shape[0] <= 0 or plate.shape[1] <= 0:
+                        print("Skipping empty or invalid crop.")
+                        continue
 
-while True:
-    frame_4_ch = camera.capture_array()
-    frame = cv2.cvtColor(frame_4_ch,cv2.COLOR_RGBA2RGB)
-    
-    frame_counter += 1
-    
-    if frame_counter % check_frame == 0:
-        frame_counter = 0
-        cropped_set = plate_recognizer(frame)
-        # taking the best possible set
-        if cropped_set:
-            plate = cropped_set[0]
-            ocr_results = read_text(plate)
-            if ocr_results:
-                for plate in allowed_plates:
-                    found = find_plate(ocr_results,plate)
-                    if found:
-                        break
-                    else:
-                        found = False
+                    ocr_results = read_text(plate)
+
+                    if ocr_results:
+                        for plate in allowed_plates:
+                            found = find_plate(ocr_results,plate)
+                            if found:
+                                break
+                            else:
+                                found = False
         
-                if found:
-                    print('OPEN GATE')
-                else:
-                    print('Wrong VEHICLE')
+                        if found:
+                            print('OPEN GATE')
+                        else:
+                            print('Wrong VEHICLE')
             
-        else:
-            print('NO VEHICLE')
-
-
-camera.stop()
+                else:
+                    print('NO VEHICLE')
+		 
+	    #cv2.imshow('Live',frame)
+	
+	    #if cv2.waitKey(1) & 0xFF == ord('q'):
+	    #	break
+except KeyboardInterrupt:
+    sys.exit(0)
+except Exception as e:
+    print(f'{e}')
+finally:
+    cleanup()
