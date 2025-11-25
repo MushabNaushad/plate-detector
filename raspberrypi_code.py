@@ -48,7 +48,7 @@ def read_text(image) -> list:
     ''' This function reads the Numberplate and returns a list of strings '''
     
     # read the plate
-    results = reader.ocr(image, cls=False) 
+    results = reader.ocr(image) 
     if not results or results[0] is None:
         return None
 
@@ -91,19 +91,18 @@ def check_presence(address):
         return False
 
 def control_gate():
-    print("Car detected! Opening Gate...")
+    print("Operating Gate")
     GPIO.output(GATE_PIN, GPIO.HIGH)
     time.sleep(1) # Simulate button press duration
     GPIO.output(GATE_PIN, GPIO.LOW)
 
 def second_authentication():
-    for _ in range(10):
-        if check_presence:
-            control_gate()
-        else:
-            print('No phone detected')
-        
-        time.sleep(2)  # Wait between scans to save CPU/interference
+    for address in target_macs:
+        for _ in range(2):
+            if check_presence(address):
+                control_gate()
+                return True
+            time.sleep(2)  # Wait between scans to save CPU/interference
 
 if __name__ == '__main__':
     # initialize Camera
@@ -112,7 +111,7 @@ if __name__ == '__main__':
     camera.start()
 
     # initialize Model
-    reader = PaddleOCR(use_angle_cls=False, lang="en", show_log=False)  
+    reader = PaddleOCR(use_angle_cls=True, lang="en", show_log=False)  
     recognizer = YOLO('modelv2.pt')
 
     # control variables
@@ -123,6 +122,7 @@ if __name__ == '__main__':
     ]
     target_macs = [
         "90:B7:90:07:FC:F0",
+        "F0:55:01:BF:53:13"
     ]
     GATE_PIN = 17
     Gate_Position = False # True = Open and False = closed
@@ -161,22 +161,29 @@ if __name__ == '__main__':
                                     break
                                 else:
                                     found = False
-            
-                            if found:
-                                print('OPEN GATE')
+                            print(ocr_results)
+                            if found and not Gate_Position:
+                                print('Plate Detected')
                                 if sec_auth:
-                                    second_authentication()
+                                    isOpen = second_authentication()
+                                    if isOpen:
+                                        Gate_Position = True
                                 else:
                                     control_gate()
-                                Gate_Position = True
+                                    Gate_Position = True
 
                             else:
-                                print('Wrong VEHICLE')
+                                if Gate_Position:
+                                    print('Car is at the Gate')
+                                else:
+                                    print('Wrong VEHICLE')
                 
                     else:
                         print('NO VEHICLE')
                         if Gate_Position:
+                            print('Waiting')
                             time.sleep(30)
+                            print('Closing Gate')
                             # close gate
                             control_gate()
                             Gate_Position = False
