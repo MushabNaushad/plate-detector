@@ -7,10 +7,13 @@ import sys
 from picamera2 import Picamera2
 import RPi.GPIO as GPIO
 import time
+import subprocess
 
 def cleanup():
     camera.stop()
-    GPIO.setmode(GATE_PIN, GPIO.LOW)
+    if Gate_Position:
+        # Close the Gate
+        control_gate()
     GPIO.cleanup()
 
 def plate_recognizer(image):
@@ -45,7 +48,7 @@ def read_text(image) -> list:
     ''' This function reads the Numberplate and returns a list of strings '''
     
     # read the plate
-    results = reader.ocr(image, cls=False) 
+    results = reader.ocr(image) 
     if not results or results[0] is None:
         return None
 
@@ -76,7 +79,31 @@ def find_plate(texts:list,plate:list)->bool:
     Found_plate = Counter(parts) == Counter(plate)
 
     return Found_plate
-            
+
+def check_presence(address):
+    # l2ping sends a ping to the bluetooth device
+    # -c 1 sends 1 packet, -t 1 sets timeout to 1 second
+    command = f"sudo l2ping -c 1 -t 1 {address}"
+    try:
+        subprocess.check_output(command, shell=True)
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+def control_gate():
+    print("Operating Gate")
+    GPIO.output(GATE_PIN, GPIO.HIGH)
+    time.sleep(1) # Simulate button press duration
+    GPIO.output(GATE_PIN, GPIO.LOW)
+
+def second_authentication():
+    for address in target_macs:
+        for _ in range(2):
+            if check_presence(address):
+                control_gate()
+                return True
+            time.sleep(2)  # Wait between scans to save CPU/interference
+
 if __name__ == '__main__':
     # initialize Camera
     camera = Picamera2()
@@ -84,7 +111,7 @@ if __name__ == '__main__':
     camera.start()
 
     # initialize Model
-    reader = PaddleOCR(use_angle_cls=False, lang="en", show_log=False)  
+    reader = PaddleOCR(use_angle_cls=True, lang="en", show_log=False)  
     recognizer = YOLO('modelv2.pt')
 
     # control variables
@@ -93,12 +120,17 @@ if __name__ == '__main__':
     allowed_plates = [
         ['CP','MQ','5196']
     ]
+    target_macs = [
+        "90:B7:90:07:FC:F0",
+        "F0:55:01:BF:53:13"
+    ]
     GATE_PIN = 17
     Gate_Position = False # True = Open and False = closed
+    sec_auth = True # set true to check for phone
 
     GPIO.setmode(GPIO.BCM)
     GPIO.setup(GATE_PIN, GPIO.OUT)
-    GPIO.setmode(GATE_PIN, GPIO.LOW)
+    GPIO.output(GATE_PIN, GPIO.LOW)
 
     try:
         while True:
@@ -129,19 +161,31 @@ if __name__ == '__main__':
                                     break
                                 else:
                                     found = False
-            
-                            if found:
-                                print('OPEN GATE')
-                                GPIO.setmode(GATE_PIN, GPIO.HIGH)
-                                Gate_Position = True
+                            print(ocr_results)
+                            if found and not Gate_Position:
+                                print('Plate Detected')
+                                if sec_auth:
+                                    isOpen = second_authentication()
+                                    if isOpen:
+                                        Gate_Position = True
+                                else:
+                                    control_gate()
+                                    Gate_Position = True
 
                             else:
-                                print('Wrong VEHICLE')
+                                if Gate_Position:
+                                    print('Car is at the Gate')
+                                else:
+                                    print('Wrong VEHICLE')
                 
                     else:
                         print('NO VEHICLE')
                         if Gate_Position:
-                            time.sleep(20)
+                            print('Waiting')
+                            time.sleep(30)
+                            print('Closing Gate')
+                            # close gate
+                            control_gate()
                             Gate_Position = False
             else:
                 break
