@@ -104,6 +104,15 @@ def second_authentication():
                 return True
             time.sleep(2)  # Wait between scans to save CPU/interference
 
+def readFile(filename:str,readplate:bool=False)->list:
+    texts = []
+    with open(filename,'r') as file:
+        line = file.readline()
+        if readplate:
+            line = line.split(',')
+        texts.append(line)
+    return texts
+
 if __name__ == '__main__':
     # initialize Camera
     camera = Picamera2()
@@ -117,13 +126,8 @@ if __name__ == '__main__':
     # control variables
     frame_counter = 0
     check_frame = 20
-    allowed_plates = [
-        ['CP','MQ','5196']
-    ]
-    target_macs = [
-        "90:B7:90:07:FC:F0",
-        "F0:55:01:BF:53:13"
-    ]
+    allowed_plates = readFile('Allowed plates.txt',True)
+    target_macs = readFile('target macs.txt')
     GATE_PIN = 17
     Gate_Position = False # True = Open and False = closed
     sec_auth = True # set true to check for phone
