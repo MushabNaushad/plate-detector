@@ -16,7 +16,7 @@ def cleanup():
         control_gate()
     GPIO.cleanup()
 
-def plate_recognizer(image):
+def plate_recognizer(image)->list:
     ''' This Function recognizes the numberplate and return the cropped image of the plate'''
 
     # initialize recognizer and get results
