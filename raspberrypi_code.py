@@ -8,6 +8,11 @@ from picamera2 import Picamera2
 import RPi.GPIO as GPIO
 import time
 import subprocess
+from image_capture import get_snapshot
+
+#Checks to see if a car is present under the gate before closing it
+def car_present():
+    pass
 
 def cleanup():
     camera.stop()
@@ -16,7 +21,7 @@ def cleanup():
         control_gate()
     GPIO.cleanup()
 
-def plate_recognizer(image):
+def plate_recognizer(image)->list:
     ''' This Function recognizes the numberplate and return the cropped image of the plate'''
 
     # initialize recognizer and get results
@@ -24,6 +29,7 @@ def plate_recognizer(image):
 
     # to store cropped plates if there is more than one
     cropped_images = []
+    coordinates_list = []
 
     for result in results:
         boxes = result.boxes
@@ -41,8 +47,9 @@ def plate_recognizer(image):
             if probability > 0.5:
                 cropped_img = image[y1:y2,x1:x2]
                 cropped_images.append(cropped_img)
+                coordinates_list.append([x1, y1, x2, y2])
 
-    return cropped_images
+    return cropped_images, coordinates_list
 
 def read_text(image) -> list:
     ''' This function reads the Numberplate and returns a list of strings '''
@@ -71,7 +78,7 @@ def find_plate(texts:list,plate:list)->bool:
         # remove -, spaces from the detected text
         alphanum_in_plate = text.replace('-', '').replace(' ', '')
         jumbled_plate += alphanum_in_plate
-    
+    ''
     # find any permutation of the letters and numbers given to be identical to the plate
     pattern_of_plate = '|'.join(plate)
     parts = re.findall(rf'({pattern_of_plate})', jumbled_plate)
@@ -90,27 +97,34 @@ def check_presence(address):
     except subprocess.CalledProcessError:
         return False
 
-def control_gate():
-    print("Operating Gate")
-    GPIO.output(GATE_PIN, GPIO.HIGH)
-    time.sleep(1) # Simulate button press duration
-    GPIO.output(GATE_PIN, GPIO.LOW)
+def control_gate(toOpen:bool):
+    # True is Opening
+    if toOpen:
+        print('Opening Gate')
+        GPIO.output(OPEN_PIN,GPIO.LOW)
+        time.sleep(1) #simulate button press duration
+        GPIO.output(OPEN_PIN,GPIO.HIGH)
+    else:
+        print('Closing Gate')
+        GPIO.output(CLOSE_PIN,GPIO.LOW)
+        time.sleep(1) #simulate button press duration
+        GPIO.output(CLOSE_PIN,GPIO.HIGH)
 
 def second_authentication():
     for address in target_macs:
         for _ in range(2):
             if check_presence(address):
-                control_gate()
+                
                 return True
             time.sleep(2)  # Wait between scans to save CPU/interference
 
 def readFile(filename:str,readplate:bool=False)->list:
     texts = []
     with open(filename,'r') as file:
-        line = file.readline()
-        if readplate:
-            line = line.split(',')
-        texts.append(line)
+        for line in file:
+            if readplate:
+                line = line.split(',')
+            texts.append(line)
     return texts
 
 if __name__ == '__main__':
@@ -128,13 +142,16 @@ if __name__ == '__main__':
     check_frame = 20
     allowed_plates = readFile('Allowed plates.txt',True)
     target_macs = readFile('target macs.txt')
-    GATE_PIN = 17
+    OPEN_PIN = 17
+    CLOSE_PIN = 27
     Gate_Position = False # True = Open and False = closed
     sec_auth = True # set true to check for phone
 
     GPIO.setmode(GPIO.BCM)
-    GPIO.setup(GATE_PIN, GPIO.OUT)
-    GPIO.output(GATE_PIN, GPIO.LOW)
+    GPIO.setup(OPEN_PIN, GPIO.OUT)
+    GPIO.output(OPEN_PIN, GPIO.HIGH)
+    GPIO.setup(CLOSE_PIN, GPIO.OUT)
+    GPIO.output(CLOSE_PIN, GPIO.HIGH)
 
     try:
         while True:
@@ -145,7 +162,7 @@ if __name__ == '__main__':
         
                 if frame_counter % check_frame == 0:
                     frame_counter = 0
-                    cropped_set = plate_recognizer(frame)
+                    cropped_set, coordinates = plate_recognizer(frame)
                     # taking the best possible set
             
                     if cropped_set:
@@ -162,6 +179,7 @@ if __name__ == '__main__':
                             for plate in allowed_plates:
                                 found = find_plate(ocr_results, plate)
                                 if found:
+                                    get_snapshot(frame, coordinates[0])
                                     break
                                 else:
                                     found = False
@@ -171,26 +189,31 @@ if __name__ == '__main__':
                                 if sec_auth:
                                     isOpen = second_authentication()
                                     if isOpen:
+                                        control_gate(True)
                                         Gate_Position = True
+                                    else:
+                                        print('No Phone Detected')
                                 else:
-                                    control_gate()
+                                    control_gate(True)
                                     Gate_Position = True
 
+                            elif not found:
+                                print('Wrong VEHICLE')
                             else:
-                                if Gate_Position:
-                                    print('Car is at the Gate')
-                                else:
-                                    print('Wrong VEHICLE')
+                                print('Car is at the Gate')
                 
                     else:
                         print('NO VEHICLE')
                         if Gate_Position:
-                            print('Waiting')
-                            time.sleep(30)
-                            print('Closing Gate')
-                            # close gate
-                            control_gate()
-                            Gate_Position = False
+                            while Gate_Position:
+                                print('Waiting')
+                                time.sleep(15)
+                                if not car_present():
+                                    time.sleep(10)
+                                    control_gate(False)
+                                    Gate_Position = False
+                           
+                            
             else:
                 break
     except KeyboardInterrupt:
