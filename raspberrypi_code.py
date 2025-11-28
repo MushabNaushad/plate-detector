@@ -49,7 +49,7 @@ def plate_recognizer(image)->list:
                 cropped_images.append(cropped_img)
                 coordinates_list.append([x1, y1, x2, y2])
 
-    return cropped_images, coordinates_list
+    return cropped_images, [x1, y1, x2, y2]
 
 def read_text(image) -> list:
     ''' This function reads the Numberplate and returns a list of strings '''
@@ -179,7 +179,7 @@ if __name__ == '__main__':
                             for plate in allowed_plates:
                                 found = find_plate(ocr_results, plate)
                                 if found:
-                                    get_snapshot(frame, coordinates[0])
+                                    get_snapshot(frame, plate, coordinates)
                                     break
                                 else:
                                     found = False
@@ -207,10 +207,11 @@ if __name__ == '__main__':
                         if Gate_Position:
                             while Gate_Position:
                                 print('Waiting')
-                                time.sleep(15)
+                                time.sleep(10)
                                 if not car_present():
-                                    time.sleep(10)
-                                    control_gate(False)
+                                    time.sleep(5)
+                                    print('Closing Gate')
+                                    control_gate()
                                     Gate_Position = False
                            
                             
