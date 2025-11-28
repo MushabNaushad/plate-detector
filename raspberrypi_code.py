@@ -21,7 +21,7 @@ def cleanup():
         control_gate()
     GPIO.cleanup()
 
-def plate_recognizer(image):
+def plate_recognizer(image)->list:
     ''' This Function recognizes the numberplate and return the cropped image of the plate'''
 
     # initialize recognizer and get results
@@ -29,6 +29,7 @@ def plate_recognizer(image):
 
     # to store cropped plates if there is more than one
     cropped_images = []
+    coordinates_list = []
 
     for result in results:
         boxes = result.boxes
@@ -46,6 +47,7 @@ def plate_recognizer(image):
             if probability > 0.5:
                 cropped_img = image[y1:y2,x1:x2]
                 cropped_images.append(cropped_img)
+                coordinates_list.append([x1, y1, x2, y2])
 
     return cropped_images, [x1, y1, x2, y2]
 
@@ -95,11 +97,18 @@ def check_presence(address):
     except subprocess.CalledProcessError:
         return False
 
-def control_gate():
-    print("Operating Gate")
-    GPIO.output(GATE_PIN, GPIO.HIGH)
-    time.sleep(1) # Simulate button press duration
-    GPIO.output(GATE_PIN, GPIO.LOW)
+def control_gate(toOpen:bool):
+    # True is Opening
+    if toOpen:
+        print('Opening Gate')
+        GPIO.output(OPEN_PIN,GPIO.LOW)
+        time.sleep(1) #simulate button press duration
+        GPIO.output(OPEN_PIN,GPIO.HIGH)
+    else:
+        print('Closing Gate')
+        GPIO.output(CLOSE_PIN,GPIO.LOW)
+        time.sleep(1) #simulate button press duration
+        GPIO.output(CLOSE_PIN,GPIO.HIGH)
 
 def second_authentication():
     for address in target_macs:
@@ -112,10 +121,10 @@ def second_authentication():
 def readFile(filename:str,readplate:bool=False)->list:
     texts = []
     with open(filename,'r') as file:
-        line = file.readline()
-        if readplate:
-            line = line.split(',')
-        texts.append(line)
+        for line in file:
+            if readplate:
+                line = line.split(',')
+            texts.append(line)
     return texts
 
 if __name__ == '__main__':
@@ -133,13 +142,16 @@ if __name__ == '__main__':
     check_frame = 20
     allowed_plates = readFile('Allowed plates.txt',True)
     target_macs = readFile('target macs.txt')
-    GATE_PIN = 17
+    OPEN_PIN = 17
+    CLOSE_PIN = 27
     Gate_Position = False # True = Open and False = closed
     sec_auth = True # set true to check for phone
 
     GPIO.setmode(GPIO.BCM)
-    GPIO.setup(GATE_PIN, GPIO.OUT)
-    GPIO.output(GATE_PIN, GPIO.LOW)
+    GPIO.setup(OPEN_PIN, GPIO.OUT)
+    GPIO.output(OPEN_PIN, GPIO.HIGH)
+    GPIO.setup(CLOSE_PIN, GPIO.OUT)
+    GPIO.output(CLOSE_PIN, GPIO.HIGH)
 
     try:
         while True:
@@ -177,10 +189,12 @@ if __name__ == '__main__':
                                 if sec_auth:
                                     isOpen = second_authentication()
                                     if isOpen:
-                                        control_gate()
+                                        control_gate(True)
                                         Gate_Position = True
+                                    else:
+                                        print('No Phone Detected')
                                 else:
-                                    control_gate()
+                                    control_gate(True)
                                     Gate_Position = True
 
                             elif not found:
