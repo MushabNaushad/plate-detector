@@ -8,6 +8,7 @@ from picamera2 import Picamera2
 import RPi.GPIO as GPIO
 import time
 import subprocess
+from image_capture import get_snapshot
 
 #Checks to see if a car is present under the gate before closing it
 def car_present():
@@ -46,7 +47,7 @@ def plate_recognizer(image):
                 cropped_img = image[y1:y2,x1:x2]
                 cropped_images.append(cropped_img)
 
-    return cropped_images
+    return cropped_images, [x1, y1, x2, y2]
 
 def read_text(image) -> list:
     ''' This function reads the Numberplate and returns a list of strings '''
@@ -149,7 +150,7 @@ if __name__ == '__main__':
         
                 if frame_counter % check_frame == 0:
                     frame_counter = 0
-                    cropped_set = plate_recognizer(frame)
+                    cropped_set, coordinates = plate_recognizer(frame)
                     # taking the best possible set
             
                     if cropped_set:
@@ -166,6 +167,7 @@ if __name__ == '__main__':
                             for plate in allowed_plates:
                                 found = find_plate(ocr_results, plate)
                                 if found:
+                                    get_snapshot(frame, plate, coordinates)
                                     break
                                 else:
                                     found = False
